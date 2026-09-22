@@ -17,10 +17,11 @@ load_dotenv()
 
 from fastapi import Body, FastAPI, Header, HTTPException, Response, status  # noqa: E402
 from fastapi.exceptions import RequestValidationError  # noqa: E402
-from fastapi.responses import JSONResponse  # noqa: E402
+from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
 import jobs  # noqa: E402
+import reports  # noqa: E402
 import judge  # noqa: E402
 
 app = FastAPI(
@@ -128,6 +129,53 @@ def job_status(job_id: str):
     if job is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
     return job
+
+
+@app.post("/reports", tags=["reports"], status_code=status.HTTP_202_ACCEPTED,
+          summary="Queue a PDF report (202)")
+def create_report(
+    response: Response,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+):
+    """Queues a report. Returns immediately - the query and the render happen in the worker.
+
+    The response carries a *link*, never the file. A 20 MB body in JSON is how you take a
+    client down; the bytes are fetched once, on demand, from /reports/{id}/file.
+    """
+    created = jobs.create_job(["report"], idempotency_key, kind="report")
+    response.headers["Location"] = f"/reports/{created.job_id}"
+    return {
+        "job_id": created.job_id,
+        "status": "queued",
+        "reused": created.reused,
+        "status_url": f"/reports/{created.job_id}",
+    }
+
+
+@app.get("/reports/{job_id}", tags=["reports"], summary="Report status and download link")
+def report_status(job_id: str):
+    job = jobs.get_job(job_id)
+    if job is None or job.get("kind") != "report":
+        raise HTTPException(status_code=404, detail=f"Report {job_id} not found")
+    out = {k: job[k] for k in ("id", "status", "created_at", "finished_at", "error")}
+    if job["status"] == "succeeded" and job.get("artifact_path"):
+        from pathlib import Path as _P
+        out["download_url"] = f"/reports/{job_id}/file"
+        out["size_bytes"] = _P(job["artifact_path"]).stat().st_size
+    return out
+
+
+@app.get("/reports/{job_id}/file", tags=["reports"], summary="Download the PDF")
+def report_file(job_id: str):
+    job = jobs.get_job(job_id)
+    if job is None or not job.get("artifact_path"):
+        raise HTTPException(status_code=404, detail=f"No artifact for report {job_id}")
+    from pathlib import Path as _P
+    path = _P(job["artifact_path"])
+    if not path.is_file():
+        raise HTTPException(status_code=410, detail="Artifact no longer on disk")
+    return FileResponse(path, media_type="application/pdf",
+                        filename=f"commit-triage-{job_id[:8]}.pdf")
 
 
 @app.get("/alerts", tags=["background"], summary="Every alert raised so far")

@@ -1,1 +1,1 @@
-2026-09-22T17:22:27+00:00 [error] job=5ba0c7d1-1dc7-4122-a9d4-0c048512d626 1/3 items failed after 3 attempts
+2026-09-22T17:41:54+00:00 [critical] job=0a771bce-e730-4a39-83ed-1b733d165eb5 worker crashed: UnboundLocalError: cannot access local variable 'items' where it is not associated with a value

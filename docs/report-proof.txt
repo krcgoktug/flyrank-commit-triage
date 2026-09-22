@@ -1,0 +1,28 @@
+### W7 PDF report generator - query, render, store, link
+
+== POST /reports answers immediately; nothing is rendered in the request ==
+HTTP/1.1 202 Accepted
+location: /reports/6afc8d66-6f77-43bb-93b1-994b0238aa76
+{"job_id":"6afc8d66-6f77-43bb-93b1-994b0238aa76","status":"queued","reused":false,"status_url":"/reports/6afc8d66-6f77-43bb-93b1-994b0238aa76"}
+  accepted in 116 ms
+
+== poll until the worker finishes ==
+  succeeded
+
+== the response carries a LINK, not the bytes ==
+{
+    "id": "6afc8d66-6f77-43bb-93b1-994b0238aa76",
+    "status": "succeeded",
+    "created_at": "2026-09-22T17:44:58+00:00",
+    "finished_at": "2026-09-22T17:44:58+00:00",
+    "error": null,
+    "download_url": "/reports/6afc8d66-6f77-43bb-93b1-994b0238aa76/file",
+    "size_bytes": 2766
+}
+
+== fetching the artifact ==
+  HTTP 200  application/pdf  2766 bytes
+  magic bytes: %PDF-
+
+== idempotency holds for reports too ==
+  same key -> 6afc8d66-6f77-43bb-93b1-994b0238aa76 True

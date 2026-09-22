@@ -82,7 +82,9 @@ def init_db() -> None:
                 created_at      TEXT NOT NULL,
                 started_at      TEXT,
                 finished_at     TEXT,
-                error           TEXT
+                error           TEXT,
+                kind            TEXT NOT NULL DEFAULT 'classify',
+                artifact_path   TEXT
             );
 
             -- The idempotency guarantee lives here, in the schema. Two concurrent POSTs
@@ -130,7 +132,8 @@ class CreatedJob:
     reused: bool
 
 
-def create_job(messages: list[str], idempotency_key: str | None) -> CreatedJob:
+def create_job(messages: list[str], idempotency_key: str | None,
+               kind: str = "classify") -> CreatedJob:
     """Insert a job and its items. Returns the existing job when the key repeats."""
     if idempotency_key:
         with connect() as conn:
@@ -144,9 +147,9 @@ def create_job(messages: list[str], idempotency_key: str | None) -> CreatedJob:
     try:
         with connect() as conn:
             conn.execute(
-                "INSERT INTO jobs (id, idempotency_key, status, total, created_at) "
-                "VALUES (?,?,?,?,?)",
-                (job_id, idempotency_key, "queued", len(messages), _now()),
+                "INSERT INTO jobs (id, idempotency_key, status, total, created_at, kind) "
+                "VALUES (?,?,?,?,?,?)",
+                (job_id, idempotency_key, "queued", len(messages), _now(), kind),
             )
             conn.executemany(
                 "INSERT INTO items (job_id, message, status) VALUES (?,?,'pending')",
@@ -192,6 +195,13 @@ def _process(job_id: str) -> None:
     with connect() as conn:
         conn.execute("UPDATE jobs SET status='running', started_at=? WHERE id=?",
                      (_now(), job_id))
+        kind = conn.execute("SELECT kind FROM jobs WHERE id=?", (job_id,)).fetchone()["kind"]
+
+    if kind == "report":
+        _process_report(job_id)
+        return
+
+    with connect() as conn:
         items = conn.execute(
             "SELECT id, message FROM items WHERE job_id=? AND status='pending' ORDER BY id",
             (job_id,),
@@ -253,6 +263,28 @@ def _process(job_id: str) -> None:
         raise_alert(job_id, "critical", f"worker crashed: {type(exc).__name__}: {exc}")
     finally:
         client.close()
+
+
+def _process_report(job_id: str) -> None:
+    """Query, render, store the path. The bytes never travel through a response body."""
+    import reports  # imported here to keep the module import graph one-directional
+
+    try:
+        path = reports.build_report(job_id)
+        with connect() as conn:
+            conn.execute(
+                "UPDATE jobs SET status='succeeded', finished_at=?, done=1, total=1, "
+                "artifact_path=? WHERE id=?",
+                (_now(), str(path), job_id),
+            )
+    except Exception as exc:  # noqa: BLE001
+        with connect() as conn:
+            conn.execute(
+                "UPDATE jobs SET status='failed', finished_at=?, failed=1, total=1, "
+                "error=? WHERE id=?",
+                (_now(), f"{type(exc).__name__}: {exc}", job_id),
+            )
+        raise_alert(job_id, "error", f"report generation failed: {type(exc).__name__}: {exc}")
 
 
 def _worker_loop() -> None:
