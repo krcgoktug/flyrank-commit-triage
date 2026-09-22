@@ -1,0 +1,32 @@
+### W7 BE-06 - retries and alerts, proven by forcing a failure
+### server started with TRIAGE_FAULT_SUBSTRING=POISON
+### judge() degrades to a fallback instead of raising, so without a forced fault the
+### item-failure path never runs - and untested error handling is not error handling.
+
+== queue a job where one of three items is poisoned ==
+{"job_id":"5ba0c7d1-1dc7-4122-a9d4-0c048512d626","status":"queued","total":3,"reused":false,"status_url":"/jobs/5ba0c7d1-1dc7-4122-a9d4-0c048512d626"}
+
+== wait for it to finish ==
+  running 0/3
+  running 0/3
+  running 2/3
+  failed 3/3
+
+== final job state ==
+status      : failed
+total/done/failed: 3 2 1
+  done    attempts=1 err=None :: Fix mobile overflow on the live page
+  failed  attempts=3 err=RuntimeError: injected fault (POISON) :: POISON this item always fails
+  done    attempts=1 err=None :: Stage 6: publish to GitHub and write READM
+alerts on this job:
+   error - 1/3 items failed after 3 attempts
+
+== the alert reached both destinations ==
+$ cat alerts.log
+2026-09-22T17:22:27+00:00 [error] job=5ba0c7d1-1dc7-4122-a9d4-0c048512d626 1/3 items failed after 3 attempts
+
+$ curl -s localhost:8100/alerts
+  2026-09-22T17:22:27+00:00 error - 1/3 items failed after 3 attempts
+
+-> one item failed after 3 attempts; the other two completed anyway (isolation),
+   the job is marked failed, and the alert is both queryable and tailable.

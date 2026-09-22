@@ -1,0 +1,37 @@
+### W7 BE-06 - background job proof
+### http://127.0.0.1:8100
+
+== 1. the endpoint answers immediately, before any work ==
+  POST /jobs -> HTTP 202 in 29 ms
+  body: {'job_id': '832a2a74-e721-48d4-9782-5836180f8e42', 'status': 'queued', 'total': 3, 'reused': False, 'status_url': '/jobs/832a2a74-e721-48d4-9782-5836180f8e42'}
+  Location header: /jobs/832a2a74-e721-48d4-9782-5836180f8e42
+  PASS  returns 202
+  PASS  answers in well under a second
+        29 ms
+  PASS  returns a status URL
+
+== 2. idempotency: the same key must not start a second job ==
+  same key -> job_id 832a2a74-e721-48d4-9782-5836180f8e42 reused=True
+  PASS  same key returns the same job
+  PASS  and is marked reused
+  6 concurrent POSTs with one key -> 1 distinct job id(s)
+  PASS  6 concurrent requests create exactly one job
+        ids={'7a68338f-32e8-4ead-9790-858d28526462'}
+  PASS  a different key does create a new job
+
+== 3. the worker does the work after the response ==
+  status succeeded  progress 3/3  failed 0
+    done    attempts=1 mistake=True cat=bugfix src=model :: Fix mobile overflow on the live page
+    done    attempts=1 mistake=False cat=feature src=model :: Add a prefix to every cache key so tenants cannot re
+    done    attempts=1 mistake=True cat=revert src=model :: Revert "Stage 4: auth middleware and logout endpoint
+  PASS  job finished
+  PASS  every item was processed
+  PASS  results are attached to the job
+
+== 4. unknown job id ==
+  GET /jobs/does-not-exist -> 404 {"error":"Job does-not-exist not found"}
+  PASS  unknown id is 404
+
+==============================================================
+11/11 checks passed
+==============================================================

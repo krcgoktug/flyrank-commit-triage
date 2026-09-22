@@ -1,0 +1,56 @@
+### W6 Connect to an AI API - eight cases
+### endpoint http://127.0.0.1:8100/classify
+
+model: qwen2.5:7b via http://127.0.0.1:11434/v1
+
+--- case 1: PASS (5277 ms) ---
+    why      Plain bugfix, stated as one. The easy case.
+    message  Fix mobile overflow on the live page
+    got      records_mistake=True category=bugfix confidence=0.95 source=model attempts=1
+    evidence Fix mobile overflow on the live page
+
+--- case 2: PASS (7641 ms) ---
+    why      A correction of an earlier commit - an admitted mistake, not a repair.
+    message  Harden the centering, and correct the previous commit message. The previous commit said it fixed a mobile over
+    got      records_mistake=True category=bugfix confidence=0.95 source=model attempts=1
+    evidence correct the previous commit message. The previous commit said it fixed a mobile overflow. It did not, because 
+
+--- case 3: PASS (5273 ms) ---
+    why      Pure feature work. No mistake anywhere in it.
+    message  Stage 1: signup and login routes working
+    got      records_mistake=False category=feature confidence=0.8 source=model attempts=1
+    evidence Stage 1: signup and login routes working
+
+--- case 4: PASS (4446 ms) ---
+    why      Docs only.
+    message  Stage 6: publish to GitHub and write README
+    got      records_mistake=False category=docs confidence=0.8 source=model attempts=1
+    evidence write README
+
+--- case 5: PASS (5039 ms) ---
+    why      THE FALSE POSITIVE. Contains the literal substring 'fix' inside 'prefix'. A keyword grep fires; this must not.
+    message  Add a prefix to every cache key so tenants cannot read each other's rows
+    got      records_mistake=False category=feature confidence=0.8 source=model attempts=1
+    evidence Add a prefix to every cache key
+
+--- case 6: PASS (7144 ms) ---
+    why      THE FALSE NEGATIVE. This is the mojibake encoding bug from the scraper - a real mistake - and it contains none of the usual keywords. A grep misses it; this must catch it.
+    message  Stage 5: 60 clean records collected. Also corrects the first run, where the site sends no charset so every cur
+    got      records_mistake=True category=bugfix confidence=0.95 source=model attempts=1
+    evidence corrects the first run, where the site sends no charset so every currency symbol came out as two characters
+
+--- case 7: PASS (4210 ms) ---
+    why      An explicit revert. Different category, still a recorded mistake.
+    message  Revert "Stage 4: auth middleware and logout endpoint"
+    got      records_mistake=True category=revert confidence=1.0 source=model attempts=1
+    evidence Revert
+
+--- case 8: PASS (4320 ms) ---
+    why      Empty of meaning. The honest answer is low confidence, not a guess dressed up as one.
+    message  wip
+    got      records_mistake=False category=unknown confidence=0.5 source=model attempts=1
+    evidence wip [confidence capped: too few words to judge]
+
+==============================================================
+8/8 cases passed
+==============================================================
