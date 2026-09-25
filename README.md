@@ -31,15 +31,23 @@ That gap is the judgement, and it is the one step worth a model call.
 
 ## Run it
 
+Needs Python 3.10+ and [Ollama](https://ollama.com/download). No API key: the model runs
+locally, so this costs nothing and works offline.
+
 ```bash
 cp .env.example .env
 pip install -r requirements.txt
+
+ollama pull qwen2.5:7b             # 4.7 GB, once - the step I had left out
 ollama serve                       # or point LLM_BASE_URL at any OpenAI-compatible API
+
 uvicorn main:app --port 8100
 
 python test_cases.py               # W6: the eight cases
 python test_jobs.py                # W7: 202, idempotency, worker, 404
 ```
+
+The first model call takes ~15 s while the weights load; the rest are about a second.
 
 Docs at `/docs`.
 

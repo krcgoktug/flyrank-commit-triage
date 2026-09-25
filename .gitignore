@@ -4,4 +4,5 @@ __pycache__/
 .pytest_cache/
 .env
 jobs.db
+jobs.db-*          # SQLite's WAL sidecars; jobs.db was ignored but these two slipped through
 repos/
